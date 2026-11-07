@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Radar</title>
+<style>
+:root{color-scheme:dark}html,body{height:100%;margin:0}
+body{background:#07141a;color:#e6ede8;font:16px/1.5 -apple-system,system-ui,sans-serif;display:grid;place-items:center;padding:0 16px}
+main{width:min(100%,420px);background:#0e2229;border:1px solid rgba(94,230,208,.16);border-radius:10px;padding:24px;box-sizing:border-box}
+h1{font-size:18px;margin:0 0 6px}p{color:#8ea8a2;font-size:14px;margin:4px 0 16px}
+label{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8ea8a2;margin-bottom:6px}
+input{width:100%;box-sizing:border-box;font:inherit;padding:10px 12px;border-radius:6px;border:1px solid rgba(94,230,208,.3);background:#07141a;color:#e6ede8}
+button{margin-top:12px;width:100%;font:600 15px inherit;padding:11px;border-radius:6px;border:0;background:#5ee6d0;color:#07141a;cursor:pointer}
+input:focus-visible,button:focus-visible{outline:2px solid #f2b84b;outline-offset:2px}
+#msg{min-height:1.4em;color:#ff6b5b;font-size:14px;margin:10px 0 0}#msg.ok{color:#5ee6d0}
+</style></head><body><main>
+<h1>Private page</h1><p>Enter the password. It is remembered on this device.</p>
+<form id="f"><label for="p">Password</label><input id="p" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+<button type="submit">Unlock</button><p id="msg" role="status" aria-live="polite"></p></form>
+</main><script>
+(function(){"use strict";const ITER=310000,KEY="radar-unlock-v1",msg=document.getElementById("msg");
+const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u))),unb=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+let blob=null;const load=()=>blob?Promise.resolve(blob):fetch("app.enc",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("fetch");return r.arrayBuffer();}).then(b=>blob=new Uint8Array(b));
+async function open(raw){const d=await load(),k=await crypto.subtle.importKey("raw",raw,"AES-GCM",false,["decrypt"]);
+  const html=new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:d.slice(16,28)},k,d.slice(28)));
+  document.open();document.write(html);document.close();}
+async function derive(pass){const d=await load(),base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass.normalize("NFKC")),"PBKDF2",false,["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",salt:d.slice(0,16),iterations:ITER,hash:"SHA-256"},base,256));}
+let saved=null;try{saved=localStorage.getItem(KEY);}catch(e){}
+if(saved){msg.className="ok";msg.textContent="Unlocking...";open(unb(saved)).catch(()=>{try{localStorage.removeItem(KEY);}catch(e){}msg.className="";msg.textContent="The saved key no longer works. Enter the password again.";});}
+document.getElementById("f").addEventListener("submit",async e=>{e.preventDefault();msg.className="ok";msg.textContent="Checking...";
+  try{const raw=await derive(document.getElementById("p").value.trim());try{localStorage.setItem(KEY,b64(raw));}catch(e){}await open(raw);}
+  catch(err){try{localStorage.removeItem(KEY);}catch(e){}msg.className="";msg.textContent=err&&err.message==="fetch"?"Could not load the page. Check your connection.":"That password did not work.";}});
+})();
+</script></body></html>
